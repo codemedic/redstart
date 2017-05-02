@@ -27,12 +27,14 @@ Utility to migrate an SQLite 3 database using basic tools available in *NIX syst
 
 You need [`gitman`](https://github.com/redmatter/docker-gitman) to install [`bash-pack`](https://github.com/codemedic/bash-pack) which is required for `redstart` to work.
 
-   # clone and cd into the redstart
-   git clone https://github.com/codemedic/redstart.git
-   cd redstart
+```
+# clone and cd into the redstart
+git clone https://github.com/codemedic/redstart.git
+cd redstart
 
-   # run gitman to install dependencies
-   docker run --rm -it --volume="$(pwd):/project" redmatter/gitman install
+# run gitman to install dependencies
+docker run --rm -it --volume="$(pwd):/project" redmatter/gitman install
+```
 
 ## How to create a migration?
 You can start off by creating empty files for both UP and DOWN migrations, as below.  When you choose a MigrationID, make sure it is not a duplicate of any of the already existing migrations.
