@@ -15,11 +15,16 @@ Utility to migrate an SQLite 3 database using basic tools available in *NIX syst
          Directory where the migration SQL files are kept.
 
       --base-db-file <PathToBaseDbFile> [optional]
-         The base SQLite database file to apply migrations to, in order to create the database file (specified by --db-file)
+         The base SQLite database file to apply migrations to, in order to create
+         the database file (specified by --db-file)
 
    COMMAND
       migrate-to <MigrationID>
-         Migrate the database file specified in --db-file to the specified MigrationID.  If the db-file does not exist, it will be either copied from base-db-file, if specified, or a new one is created. If no migration table ($MigrationTable) exists, it will be created and populated with details of migrations found in migrations-dir.
+         Migrate the database file specified in --db-file to the specified MigrationID.
+         If the db-file does not exist, it will be either copied from base-db-file, if
+         specified, or a new one is created. If no migration table ($MigrationTable)
+         exists, it will be created and populated with details of migrations found in
+         migrations-dir.
 
       list-migrations
          List current migrations and their status (whether applied or not).
