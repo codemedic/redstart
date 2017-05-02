@@ -1,0 +1,12 @@
+BEGIN TRANSACTION;
+
+    CREATE TABLE "Group" (
+        ID integer PRIMARY KEY NOT NULL UNIQUE,
+        Name TEXT NOT NULL
+    );
+
+    ALTER TABLE "User"
+        ADD COLUMN GroupID INTEGER DEFAULT NULL
+            REFERENCES "Group" (ID)
+            ON DELETE CASCADE ON UPDATE NO ACTION;
+COMMIT;

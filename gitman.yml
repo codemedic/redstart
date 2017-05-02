@@ -1,0 +1,5 @@
+location: vendor/
+sources:
+  - name: bash-pack
+    repo: https://github.com/codemedic/bash-pack.git
+    rev: 0.1.1

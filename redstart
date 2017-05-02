@@ -1,0 +1,320 @@
+#!/bin/bash
+
+set -eu
+
+# shellcheck disable=SC1090
+. "$(dirname "$0")/vendor/bash-pack/init.sh" \
+    logging validate array
+
+MigrationTable=_Migration
+
+usage_help() {
+    [ -z "$*" ] || log error "$*"
+    cat <<HELP
+
+Migrate SQLite database
+
+Usage:
+    $(basename "$0") OPTIONS COMMAND
+
+OPTIONS
+    --db-file <PathToDbFile>
+        SQLite database file to work on.
+
+    --migrations-dir <Directory> [default: current-working-directory]
+        Directory where the migration SQL files are kept.
+
+    --base-db-file <PathToBaseDbFile> [optional]
+        The base SQLite database file to apply migrations to, in order to create the
+        database file (specified by --db-file)
+
+COMMAND
+    migrate-to <MigrationID>
+        Migrate the database file specified in --db-file to the specified MigrationID.
+        If the db-file does not exist, it will be either copied from base-db-file, if
+        specified, or a new one is created. If no migration table ($MigrationTable)
+        exists, it will be created and populated with details of migrations found in
+        migrations-dir.
+
+    list-migrations
+        List current migrations and their status (whether applied or not).
+
+See README for more notes.
+HELP
+    [ -z "$*" ] || exit 1
+}
+
+# initialise variables
+: "${db_file:=}"
+: "${db_base_file:=}"
+: "${migrations_dir:="$(pwd)"}"
+: "${migrate_to:=}"
+: "${sqlite_bin:="$(which sqlite3)"}"
+
+log_initialise
+enable_bash_debug
+
+cli_opts="$(getopt -n "$(basename "$0")" -o '' --long migrate-to:,db-file:,migrations-dir:,base-db-file:,help -- "$@" )" || {
+    usage_help "Invalid usage"
+}
+eval "cli_opts=( ${cli_opts} )"
+for ((i = 0; i < ${#cli_opts[@]}; ++i)); do
+    case "${cli_opts[$i]}" in
+        --db-file)
+            db_file="${cli_opts[++i]}"
+            ;;
+        --base-db-file)
+            db_base_file="${cli_opts[++i]}"
+            ;;
+        --migrations-dir)
+            migrations_dir="${cli_opts[++i]}"
+            ;;
+        -h|--help)
+            usage_help
+            exit 0
+            ;;
+        --)
+            ;;
+        migrate-to|list-migrations)
+            if [ -z "${subcmd+x}" ]; then
+                subcmd="${cli_opts[i]}"
+            else
+                usage_help "Invalid usage (multiple sub-commands)"
+            fi
+            ;;
+        *)
+            if [ "${subcmd:-}" = 'migrate-to' ] && [ -z "$migrate_to" ] && is_integer "${cli_opts[i]}"; then
+                migrate_to="${cli_opts[i]}"
+            else
+                usage_help "Invalid usage (${cli_opts[i]})"
+            fi
+            ;;
+    esac
+done
+
+if [ -z "$db_file" ] || [ -z "$migrations_dir" ]; then
+    usage_help "Invalid usage"
+fi
+
+if [ ! -e "$db_file" ]; then
+    if [ -n "$db_base_file" ]; then
+        if [ ! -f "$db_base_file" ]; then
+            bail "Base db file not found"
+        fi
+        cp "$db_base_file" "$db_file"
+    else
+        touch "$db_file"
+    fi
+fi
+
+get_migration_hash() {
+    local id="$1" name="$2"
+    md5sum <(cat "$migrations_dir/${id}_"{up,down}"_${name}.sql") | cut -d' ' -f1
+}
+
+check_migration() {
+    local id="$1" name="$2" _hash="$3"
+
+    [ -f "$migrations_dir/${id}_up_${name}.sql" ] && [ -f "$migrations_dir/${id}_down_${name}.sql" ] &&
+        [ "$_hash" = "$(get_migration_hash "$id" "$name")" ]
+}
+
+perform_migration() {
+    local direction="$1" id="$2"
+    local name; name="$(_sqlite "SELECT Name FROM '${MigrationTable}' WHERE ID=${id} LIMIT 1")"
+    local file="${migrations_dir}/${id}_${direction}_${name}.sql"
+
+    log info "Applying ${direction} migration '${name}' (id:${id}) "
+    if ! _sqlite -bail < "$file"; then
+        log error "Error while applying migration '${name}'"
+        return 1
+    fi
+
+    if [ "$direction" = up ]; then
+        _sqlite "UPDATE '$MigrationTable' SET Applied=1 WHERE ID=${id}"
+    else
+        _sqlite "UPDATE '$MigrationTable' SET Applied=0 WHERE ID=${id}"
+    fi
+
+    log info "Successfully applied ${direction} migration '${name}'"
+    return 0
+}
+
+list_migrations() {
+    local delimiter="${1:- }"
+    find "$migrations_dir" -regextype posix-extended -regex '.*\/[0-9]+_up_[^/]*\.sql$' -type f -printf "%f\n" | \
+        while read -r migration_file; do
+            if [[ "$migration_file" =~ ^([[:digit:]]+)_up_([^. ]+)\.sql$ ]]; then
+                if [ ! -f "$migrations_dir/${BASH_REMATCH[1]}_down_${BASH_REMATCH[2]}.sql" ]; then
+                    bail "No matching DOWN migration was found for '$migration_file'"
+                fi
+
+                if [ "2" != "$(find "$migrations_dir" -regextype posix-extended -regex ".*\/${BASH_REMATCH[1]}_[^/]*\.sql$" -type f -printf "%f\n" | wc -l)" ]; then
+                    bail "More one pair of migration file were found for ID ${BASH_REMATCH[1]}"
+                fi
+
+                if [ "${BASH_REMATCH[1]}" -eq 0 ]; then
+                    bail "Migration ID must be greater than zero"
+                fi
+
+                local _hash; _hash="$(get_migration_hash "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")"
+                echo "${BASH_REMATCH[1]}${delimiter}${_hash}${delimiter}${BASH_REMATCH[2]}"
+            else
+                bail "Invalid migration file name: '$migration_file'"
+            fi
+        done
+}
+
+_sqlite() {
+    "$sqlite_bin" "$db_file" "$@"
+}
+
+check_db_field_exists() {
+    local table="$1" field="$2"
+    _sqlite "SELECT $field FROM $table LIMIT 1" &>/dev/null
+}
+
+create_migration_table() {
+    local table="$1"
+        _sqlite <<SQL
+CREATE TABLE IF NOT EXISTS "$table" (
+    ID integer PRIMARY KEY NOT NULL UNIQUE,
+    Name TEXT NOT NULL UNIQUE,
+    Hash TEXT NOT NULL,
+    Applied INTEGER DEFAULT 0 NOT NULL
+);
+SQL
+}
+
+populate_migration_table() {
+    local migrations i id name _hash
+    migrations=( $(list_migrations '|') )
+    log debug "migrations: ${migrations[*]}"
+    log debug "migrations#: ${#migrations[@]}"
+    for ((i=0; i<${#migrations[@]}; ++i)); do
+        ( echo "${migrations[i]//|/ }" | while read -r id md5 name; do
+            echo "INSERT OR IGNORE INTO '$MigrationTable' (ID, Hash, Name) VALUES ($id, '$md5', '$name');"
+        done ) | _sqlite -bail
+    done
+}
+
+check_and_initialise_db() {
+    local migration_table_exists id name _hash
+    migration_table_exists="$(_sqlite "SELECT COUNT (*) FROM 'sqlite_master' WHERE type='table' AND name='$MigrationTable';")"
+    if [ "$migration_table_exists" != 0 ]; then
+        # if the migration table is of old schema, drop it!
+        if ! check_db_field_exists "$MigrationTable" Hash; then
+            _sqlite "DROP TABLE '$MigrationTable'"
+        fi
+    fi
+    create_migration_table "$MigrationTable"
+
+    # check the contents of the migration table, if any, to be in sane state
+    while read -r id name _hash; do
+        if ! check_migration "$id" "$name" "$_hash"; then
+            bail "Unusable migration '$name' (id: $id) found in database"
+        fi
+    done < <( _sqlite -separator ' ' "SELECT ID, Name, Hash FROM '$MigrationTable'" )
+
+    # populate any new migrations into the table
+    populate_migration_table
+}
+
+# Prints
+#   <current> <migration-1> <migration-2> <migration-3> ...
+get_migration_status() {
+    _sqlite -separator $'\n' "SELECT
+        (SELECT IFNULL(MAX(ID), '0') FROM '_Migration' WHERE Applied=1),
+        (SELECT IFNULL(GROUP_CONCAT(ID, char(10)), '-') FROM (SELECT ID FROM '_Migration' ORDER BY ID ASC))"
+}
+
+array_index() {
+    local i
+    for ((i=2; i<=$#; ++i)); do
+        [ "${!i}" != "$1" ] && continue;
+        echo -n "$((i-2))";
+        return 0
+    done
+    return 1
+}
+
+apply_migrations_upto() {
+    status=( $(get_migration_status) )
+    current_migration="${status[0]}"
+    all_migrations=("${status[@]:1}")
+
+    if [ "${all_migrations[0]}" = '-' ]; then
+        bail "No migrations were found"
+    fi
+
+    log debug "current_migration: $current_migration"
+    log debug "all_migrations: ${all_migrations[*]}"
+    log debug "migrate_to: $migrate_to"
+
+    if [ "$migrate_to" != 0 ] && ! migrate_to_index="$(array_index "$migrate_to" "${all_migrations[@]}")"; then
+        bail "Invalid migration ID $migrate_to given, to migrate to!"
+    fi
+
+    log debug "migrate_to_index: ${migrate_to_index:-not-set}"
+
+    if [ "$current_migration" = "$migrate_to" ]; then
+        log info "Already on migration $migrate_to"
+        exit 0
+    fi
+
+    if [ "$migrate_to" = '0' ]; then
+        first_index="$(array_index "$current_migration" "${all_migrations[@]}")"
+        last_index=0
+        direction=down
+    elif [ "$current_migration" = '0' ]; then
+        first_index=0
+        last_index="$migrate_to_index"
+        direction=up
+    else
+        current_migration_index="$(array_index "$current_migration" "${all_migrations[@]}")"
+        if [[ "$migrate_to_index" > "$current_migration_index" ]]; then
+            first_index=$((current_migration_index+1))
+            last_index="$migrate_to_index"
+            direction=up
+        else
+            first_index="$current_migration_index"
+            last_index="$((migrate_to_index+1))"
+            direction=down
+        fi
+    fi
+
+    log debug "first_index: $first_index"
+    log debug "last_index: $last_index"
+    log debug "direction: $direction"
+
+    if [ "$direction" = up ]; then
+        for ((i="$first_index"; i<="$last_index"; ++i)); do
+            perform_migration "$direction" "${all_migrations[i]}"
+        done
+    else
+        for ((i="$first_index"; i>="$last_index"; --i)); do
+            perform_migration "$direction" "${all_migrations[i]}"
+        done
+    fi
+}
+
+list_migrations_with_status() {
+    _sqlite -column -header \
+        "SELECT ID, Name, Hash, (CASE Applied WHEN 1 THEN 'yes' ELSE 'no' END) AS 'Is Applied?' FROM '$MigrationTable';"
+}
+
+check_and_initialise_db
+case "$subcmd" in
+    migrate-to)
+        if [ -z "$migrate_to" ] || ! is_integer "$migrate_to"; then
+            bail "Invalid migration-id - '${migrate_to}'"
+        fi
+        apply_migrations_upto "$migrate_to"
+        ;;
+    list-migrations)
+        list_migrations_with_status
+        ;;
+    *)
+        bail "Unexpected subcmd [${subcmd}]"
+        ;;
+esac
