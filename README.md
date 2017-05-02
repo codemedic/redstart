@@ -4,6 +4,7 @@ Utility to migrate an SQLite 3 database using basic tools available in *NIX syst
 
 ## Usage
 
+```
    redstart OPTIONS COMMAND
 
    OPTIONS
@@ -22,6 +23,7 @@ Utility to migrate an SQLite 3 database using basic tools available in *NIX syst
 
       list-migrations
          List current migrations and their status (whether applied or not).
+```
 
 ## How to setup?
 
@@ -39,11 +41,15 @@ docker run --rm -it --volume="$(pwd):/project" redmatter/gitman install
 ## How to create a migration?
 You can start off by creating empty files for both UP and DOWN migrations, as below.  When you choose a MigrationID, make sure it is not a duplicate of any of the already existing migrations.
 
-   touch <migration-dir>/<NewID>_{up,down}_<ShortDescription>.sql
+```
+touch <migration-dir>/<NewID>_{up,down}_<ShortDescription>.sql
+```
 
 The ShortDescription cannot contain spaces or dots. See example below.
 
-   touch ./\$(date +%Y%m%d)_{up,down}_create-group-table.sql
+```
+touch ./\$(date +%Y%m%d)_{up,down}_create-group-table.sql
+```
 
 When adding SQLs to these migration files, it will be a good idea to wrap them in transactions. It will make sure that the database is left in a sane state, if the migration fails for what ever reason.
 
