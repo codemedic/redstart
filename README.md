@@ -53,7 +53,7 @@ touch <migration-dir>/<NewID>_{up,down}_<ShortDescription>.sql
 The ShortDescription cannot contain spaces or dots. See example below.
 
 ```
-touch ./\$(date +%Y%m%d)_{up,down}_create-group-table.sql
+touch ./$(date +%Y%m%d)_{up,down}_create-group-table.sql
 ```
 
 When adding SQLs to these migration files, it will be a good idea to wrap them in transactions. It will make sure that the database is left in a sane state, if the migration fails for what ever reason.
