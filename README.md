@@ -37,10 +37,9 @@ You need [`gitman`](https://github.com/redmatter/docker-gitman) to install [`bas
 ```
 # clone and cd into the redstart
 git clone https://github.com/codemedic/redstart.git
-cd redstart
 
 # run gitman to install dependencies
-docker run --rm -it --volume="$(pwd):/project" redmatter/gitman install
+docker run --rm -it --volume="$(pwd)/redstart:/project" redmatter/gitman install
 ```
 
 ## How to create a migration?

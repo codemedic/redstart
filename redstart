@@ -109,7 +109,7 @@ fi
 
 get_migration_hash() {
     local id="$1" name="$2"
-    md5sum <(cat "$migrations_dir/${id}_"{up,down}"_${name}.sql") | cut -d' ' -f1
+    md5sum <(cat "$migrations_dir/${id}_up_${name}.sql" "$migrations_dir/${id}_down_${name}.sql") | cut -d' ' -f1
 }
 
 check_migration() {
