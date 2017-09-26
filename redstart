@@ -225,7 +225,7 @@ check_and_initialise_db() {
 get_migration_status() {
     _sqlite -separator $'\n' "SELECT
         (SELECT IFNULL(MAX(ID), '0') FROM '_Migration' WHERE Applied=1),
-        (SELECT IFNULL(GROUP_CONCAT(ID, char(10)), '-') FROM (SELECT ID FROM '_Migration' ORDER BY ID ASC))"
+        (SELECT IFNULL(GROUP_CONCAT(ID, x'0a'), '-') FROM (SELECT ID FROM '_Migration' ORDER BY ID ASC))"
 }
 
 array_index() {
