@@ -19,12 +19,15 @@ Utility to migrate an SQLite 3 database using basic tools available in *NIX syst
          the database file (specified by --db-file)
 
    COMMAND
-      migrate-to <MigrationID>
-         Migrate the database file specified in --db-file to the specified MigrationID.
-         If the db-file does not exist, it will be either copied from base-db-file, if
-         specified, or a new one is created. If no migration table ($MigrationTable)
-         exists, it will be created and populated with details of migrations found in
-         migrations-dir.
+    migrate-to <MigrationID> OR "latest"
+        Migrate the database file specified in --db-file to the specified MigrationID.
+        If the db-file does not exist, it will be either copied from base-db-file, if
+        specified, or a new one is created. If no migration table ($MigrationTable)
+        exists, it will be created and populated with details of migrations found in
+        migrations-dir.
+
+        If the argument given is "latest", then the latest MigrationID is figured out
+        and applied.
 
       list-migrations
          List current migrations and their status (whether applied or not).
