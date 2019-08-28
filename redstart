@@ -29,12 +29,15 @@ OPTIONS
         database file (specified by --db-file)
 
 COMMAND
-    migrate-to <MigrationID>
+    migrate-to <MigrationID> OR "latest"
         Migrate the database file specified in --db-file to the specified MigrationID.
         If the db-file does not exist, it will be either copied from base-db-file, if
         specified, or a new one is created. If no migration table ($MigrationTable)
         exists, it will be created and populated with details of migrations found in
         migrations-dir.
+
+        If the argument given is "latest", then the latest MigrationID is figured out
+        and applied.
 
     list-migrations
         List current migrations and their status (whether applied or not).
@@ -83,7 +86,7 @@ for ((i = 0; i < ${#cli_opts[@]}; ++i)); do
             fi
             ;;
         *)
-            if [ "${subcmd:-}" = 'migrate-to' ] && [ -z "$migrate_to" ] && is_integer "${cli_opts[i]}"; then
+            if [ "${subcmd:-}" = 'migrate-to' ] && [ -z "$migrate_to" ]; then
                 migrate_to="${cli_opts[i]}"
             else
                 usage_help "Invalid usage (${cli_opts[i]})"
@@ -188,6 +191,7 @@ SQL
 
 populate_migration_table() {
     local migrations i id name _hash
+    # shellcheck disable=SC2207
     migrations=( $(list_migrations '|') )
     log debug "migrations: ${migrations[*]}"
     log debug "migrations#: ${#migrations[@]}"
@@ -239,6 +243,7 @@ array_index() {
 }
 
 apply_migrations_upto() {
+    # shellcheck disable=SC2207
     status=( $(get_migration_status) )
     current_migration="${status[0]}"
     all_migrations=("${status[@]:1}")
@@ -251,8 +256,13 @@ apply_migrations_upto() {
     log debug "all_migrations: ${all_migrations[*]}"
     log debug "migrate_to: $migrate_to"
 
-    if [ "$migrate_to" != 0 ] && ! migrate_to_index="$(array_index "$migrate_to" "${all_migrations[@]}")"; then
+    if [ "$migrate_to" != 0 ] && [ "$migrate_to" != 'latest' ] &&
+            ! migrate_to_index="$(array_index "$migrate_to" "${all_migrations[@]}")"; then
         bail "Invalid migration ID $migrate_to given, to migrate to!"
+    fi
+
+    if [ "$migrate_to" = 'latest' ]; then
+        migrate_to_index=$((${#all_migrations[@]}-1))
     fi
 
     log debug "migrate_to_index: ${migrate_to_index:-not-set}"
@@ -306,7 +316,7 @@ list_migrations_with_status() {
 check_and_initialise_db
 case "$subcmd" in
     migrate-to)
-        if [ -z "$migrate_to" ] || ! is_integer "$migrate_to"; then
+        if ! is_integer "$migrate_to" && [[ "$migrate_to" != latest ]]; then
             bail "Invalid migration-id - '${migrate_to}'"
         fi
         apply_migrations_upto "$migrate_to"

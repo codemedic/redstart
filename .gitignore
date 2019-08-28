@@ -1,2 +1,4 @@
-vendor/*
-!vendor/.git-placeholder
+/vendor/*
+!/vendor/.git-placeholder
+/tests/*/x.db3
+/.idea/
