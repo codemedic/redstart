@@ -57,5 +57,10 @@ touch ./$(date +%Y%m%d)_{up,down}_create-group-table.sql
 
 When adding SQLs to these migration files, it will be a good idea to wrap them in transactions. It will make sure that the database is left in a sane state, if the migration fails for what ever reason.
 
+## Known issues
+If there ever be a need to "ditch" a migration that is already known to the database, then manual intervention will be required.
+
+The migration will have to be removed from `_Migrations` table, before adding any more migrations. If you require further assistance with this, feel free to log an issue.
+
 ## Why the name?
 Redstarts are a species of small, migratory birds; taking inspiration from the feather on SQLite logo.
