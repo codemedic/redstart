@@ -42,6 +42,10 @@ COMMAND
     list-migrations
         List current migrations and their status (whether applied or not).
 
+    check
+        Check if there are any migrations to be applied. If there are any pending
+        migrations the exit code is set to 1 otherwise 0.
+
 See README for more notes.
 HELP
     [ -z "$*" ] || exit 1
@@ -52,6 +56,7 @@ HELP
 : "${db_base_file:=}"
 : "${migrations_dir:="$(pwd)"}"
 : "${migrate_to:=}"
+# shellcheck disable=SC2230
 : "${sqlite_bin:="$(which sqlite3)"}"
 
 log_initialise
@@ -78,7 +83,7 @@ for ((i = 0; i < ${#cli_opts[@]}; ++i)); do
             ;;
         --)
             ;;
-        migrate-to|list-migrations)
+        migrate-to|list-migrations|check)
             if [ -z "${subcmd+x}" ]; then
                 subcmd="${cli_opts[i]}"
             else
@@ -242,6 +247,15 @@ array_index() {
     return 1
 }
 
+check_pending_migrations() {
+    # shellcheck disable=SC2207
+    status=( $(get_migration_status) )
+    current_migration="${status[0]}"
+    all_migrations=("${status[@]:1}")
+
+    [[ "$(array_index "$current_migration" "${all_migrations[@]}")" == $((${#all_migrations[@]}-1)) ]]
+}
+
 apply_migrations_upto() {
     # shellcheck disable=SC2207
     status=( $(get_migration_status) )
@@ -323,6 +337,9 @@ case "$subcmd" in
         ;;
     list-migrations)
         list_migrations_with_status
+        ;;
+    check)
+        check_pending_migrations
         ;;
     *)
         bail "Unexpected subcmd [${subcmd}]"
