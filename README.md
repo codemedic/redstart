@@ -31,6 +31,11 @@ Utility to migrate an SQLite 3 database using basic tools available in *NIX syst
 
       list-migrations
          List current migrations and their status (whether applied or not).
+
+    check
+        Check if there are any migrations to be applied. If there are any pending
+        migrations the exit code is set to 1 otherwise 0.
+
 ```
 
 ## How to setup?
