@@ -328,7 +328,7 @@ list_migrations_with_status() {
 }
 
 check_and_initialise_db
-case "$subcmd" in
+case "${subcmd:-help}" in
     migrate-to)
         if ! is_integer "$migrate_to" && [[ "$migrate_to" != latest ]]; then
             bail "Invalid migration-id - '${migrate_to}'"
@@ -340,6 +340,9 @@ case "$subcmd" in
         ;;
     check)
         check_pending_migrations
+        ;;
+    help)
+        usage_help
         ;;
     *)
         bail "Unexpected subcmd [${subcmd}]"
