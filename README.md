@@ -22,7 +22,7 @@ Utility to migrate an SQLite 3 database using basic tools available in *NIX syst
     migrate-to <MigrationID> OR "latest"
         Migrate the database file specified in --db-file to the specified MigrationID.
         If the db-file does not exist, it will be either copied from base-db-file, if
-        specified, or a new one is created. If no migration table ($MigrationTable)
+        specified, or a new one is created. If no migration table (_Migration)
         exists, it will be created and populated with details of migrations found in
         migrations-dir.
 
@@ -49,6 +49,29 @@ git clone https://github.com/codemedic/redstart.git
 # run gitman to install dependencies
 docker run --rm -it --volume="$(pwd)/redstart:/project" redmatter/gitman install
 ```
+
+### Docker alternative
+
+An alternative to above instructions would be to use a docker image. You can either build it locally or make use of the docker image `codemedic/redstart`.
+
+    docker run --rm -it
+      -v "${PWD}:/project" \
+      codemedic/redstart \
+         --db-file /project/data.db3 \
+         --migrations-dir /project/schema \
+         --base-db-file /project/schema/base.db3 \
+         <COMMAND>
+
+For a project with directory structure as below. The optional `--base-db-file` option specifies `base.db3`, which contains tables before the any changed managed with redstart.
+
+    project
+    |-- data.db3
+    `-- schema
+       |-- 1_down_add-products-table.sql
+       |-- 1_up_add-products-table.sql
+       |-- 2_down_add-orders-table.sql
+       |-- 2_up_add-orders-table.sql
+       `-- base.db3
 
 ## How to create a migration?
 You can start off by creating empty files for both UP and DOWN migrations, as below.  When you choose a MigrationID, make sure it is not a duplicate of any of the already existing migrations.
