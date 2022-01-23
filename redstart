@@ -198,7 +198,7 @@ populate_migration_table() {
     local migrations i id name _hash
     # shellcheck disable=SC2207
     migrations=( $(list_migrations '|') )
-    log debug "migrations: ${migrations[*]}"
+    log debug "migrations: ${migrations[*]:-<none>}"
     log debug "migrations#: ${#migrations[@]}"
     for ((i=0; i<${#migrations[@]}; ++i)); do
         ( echo "${migrations[i]//|/ }" | while read -r id md5 name; do
