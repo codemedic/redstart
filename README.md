@@ -62,7 +62,7 @@ An alternative to above instructions would be to use a docker image. You can eit
          --base-db-file /project/schema/base.db3 \
          <COMMAND>
 
-For a project with directory structure as below. The optional `--base-db-file` option specifies `base.db3`, which contains tables before the any changed managed with redstart.
+For a project with directory structure as below. The optional `--base-db-file` option specifies `base.db3`, which contains tables before any changes were managed with redstart.
 
     project
     |-- data.db3
